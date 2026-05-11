@@ -1,4 +1,4 @@
-# 🚀 Large-Scale Log Analytics System
+# 🚀 Web-Logs-Large-Scale-Analytics-System
 
 ## 📌 Overview
 This project implements a **real-time log analytics pipeline** using **Apache Kafka** and **Apache Spark**. It simulates streaming web log data, processes it efficiently, and extracts meaningful insights such as error rates and user activity patterns.
