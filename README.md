@@ -40,14 +40,14 @@ This system ingests, processes, streams, and learns from web server access logs 
 
 |Name               |Student ID           |
 |-------------------|---------------------|
-|Joy Muthoni        |—                    |
-|Christine Nyokabi  |—                    |
-|Shawn Kimani       |—                    |
-|Borneventure Kinoti|—                    |
+|Joy Muthoni        |SCT213-C002-0004/2022|
+|Christine Nyokabi  |SCT213-C002-0037/2022|
+|Shawn Kimani       |SCT213-C002-0043/2022|
+|Borneventure Kinoti|SCT213-C002-0052/2022|
 |Joy Cheptoo Chesire|SCT213-C002-0087/2022|
-|Angel Wangari      |—                    |
+|Angel Wangari      |SCT213-C002-0093/2022|
 
-**Supervisor:** Samuel Adhola
+**lecturer:** Mr. Seth
 
 -----
 
