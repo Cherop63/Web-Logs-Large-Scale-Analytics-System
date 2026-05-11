@@ -1,234 +1,331 @@
 # 🚀 Web-Logs-Large-Scale-Analytics-System
 
-A real-time log analytics pipeline built with **Apache Kafka**, **Apache Spark Structured Streaming**, and **Python**. The system ingests raw web server logs, streams them through a distributed messaging layer, and processes them with live aggregations and enrichment.
+**SDS 2412 — Analysis of Large Datasets | Group 3**
 
----
+> An end-to-end distributed log analytics pipeline built over six milestones, covering batch processing, real-time streaming, machine learning, and deployment orchestration on web server access logs.
+
+-----
 
 ## Table of Contents
 
-- [Overview](#overview)
+- [Project Overview](#project-overview)
+- [Team](#team)
+- [Dataset](#dataset)
 - [Architecture](#architecture)
-- [Data Specification](#data-specification)
-- [Pipeline Stages](#pipeline-stages)
-- [Setup & Requirements](#setup--requirements)
-- [Usage](#usage)
-- [Output](#output)
+- [Technology Stack](#technology-stack)
+- [Milestones](#milestones)
+- [Model Performance](#model-performance)
+- [Known Issues & Fixes](#known-issues--fixes)
+- [Requirements Checklist](#requirements-checklist)
+- [Setup & Installation](#setup--installation)
 
----
+-----
 
-## Overview
+## Project Overview
 
-This system implements a **Lambda-style streaming pipeline** that:
+This system ingests, processes, streams, and learns from web server access logs (`weblogs.csv`). It is designed around the **Lambda Architecture** — combining a batch layer for historical analysis and a speed layer for real-time anomaly detection, both feeding into a shared serving layer.
 
-1. Reads raw web server logs from `weblog.csv`
-2. Streams records into a Kafka topic using an optimized producer
-3. Consumes and parses the stream with Spark Structured Streaming
-4. Enriches and aggregates log data in real time
-5. Outputs results to the console (extensible to dashboards or databases)
+**Core objectives:**
 
----
+- Detect anomalies and suspicious traffic patterns
+- Measure traffic volume, endpoint frequency, and error rates
+- Monitor system health via real-time streaming
+- Train and deploy an ML model for threat classification
+
+-----
+
+## Team
+
+**Group 3 — JKUAT**
+
+|Name               |Student ID           |
+|-------------------|---------------------|
+|Joy Muthoni        |—                    |
+|Christine Nyokabi  |—                    |
+|Shawn Kimani       |—                    |
+|Borneventure Kinoti|—                    |
+|Joy Cheptoo Chesire|SCT213-C002-0087/2022|
+|Angel Wangari      |—                    |
+
+**Supervisor:** Samuel Adhola
+
+-----
+
+## Dataset
+
+**File:** `weblogs.csv`  
+**Records:** 16,007 rows
+
+|Field         |Type                  |Description                              |
+|--------------|----------------------|-----------------------------------------|
+|`Timestamp`   |String → TimestampType|ISO 8601 datetime of the HTTP request    |
+|`IP`          |StringType            |Source IP address of the client          |
+|`Endpoint`    |StringType            |Requested URL path (e.g. `/api/v1/login`)|
+|`Status`      |IntegerType           |HTTP response code (200, 404, 500 …)     |
+|`ResponseTime`|IntegerType           |Server response latency in milliseconds  |
+
+
+> **Note:** The raw CSV contains a column header typo — `Staus` instead of `Status`. This is corrected in the pipeline via `df.rename(columns={"Staus": "Status"})` before creating the Spark DataFrame.
+
+-----
 
 ## Architecture
 
+The system follows a **Lambda Architecture** with three layers:
+
 ```
-[ weblog.csv ]
-      │
-      ▼
-[ Kafka Producer (Python) ]
-  - Batching (linger_ms, batch_size)
-  - Compression (lz4)
-  - Acknowledgements (acks=1)
-      │
-      ▼
-[ Kafka Topic: weblogs ]
-  - Distributed log broker
-  - Durability & scalability
-      │
-      ▼
-[ Spark Structured Streaming Consumer ]
-  - readStream from Kafka
-  - Binary → JSON → Structured columns
-  - Schema enforcement
-      │
-      ▼
-[ Processing Layer ]
-  - Enrichment: Date, Hour, IsError
-  - Aggregations: Traffic per endpoint,
-    Hourly traffic, Error rates
-      │
-      ▼
-[ Output Layer ]
-  - Console (writeStream)
-  - Extensible: Dashboards, Databases,
-    Monitoring Systems
+weblogs.csv
+     │
+     ├──────────────► [ Kafka Producer ]  linger_ms=20  batch=64KB  lz4  acks=1
+     │                        │
+     │               [ Kafka Topic: weblogs ]
+     │                   ┌────┴────┐
+     │                   │         │
+  BATCH LAYER       SPEED LAYER (Streaming)
+     │                   │
+  [ PySpark ]        [ Spark Structured Streaming ]
+  Read CSV           readStream from Kafka
+  Schema enforce     Parse JSON → StructType
+  Clean & enrich     Watermark / micro-batch
+  Aggregate          Real-time analytics
+     │                   │
+     └─────────┬─────────┘
+               │
+         SERVING LAYER
+         Parquet (output/weblogs_clean/)
+         MongoDB (weblog_system.predictions)
+         Console sinks for streaming views
 ```
 
-### Layer Breakdown
+### Scalability (Big-O Analysis)
 
-| Layer | Component | Role |
-|---|---|---|
-| Producer | Python `KafkaProducer` | Streams weblog records into Kafka |
-| Messaging | Apache Kafka | Distributed log broker; durability & scalability |
-| Consumer | Spark Structured Streaming | Subscribes to Kafka topic; parses JSON payloads |
-| Processing | Spark Transformations | Log enrichment and real-time aggregations |
-| Output | Console / External Sinks | Displays or stores processed results |
+|Operation            |Complexity    |Notes                         |
+|---------------------|--------------|------------------------------|
+|CSV read (full scan) |O(N)          |N = total log records         |
+|`dropna` cleaning    |O(N)          |Single pass per partition     |
+|`groupBy` aggregation|O(N log N)    |Shuffle sort by key           |
+|Kafka producer send  |O(1) amortised|Batched with `linger_ms`      |
+|Streaming micro-batch|O(B)          |B = records per batch interval|
+|Parquet write        |O(N)          |Columnar, partition-parallel  |
 
----
+-----
 
-## Data Specification
+## Technology Stack
 
-### Source Dataset
+|Category            |Technology                           |
+|--------------------|-------------------------------------|
+|Language            |Python 3.x                           |
+|Batch Processing    |PySpark (`local[*]`)                 |
+|Streaming           |Spark Structured Streaming           |
+|Message Broker      |Apache Kafka 2.3.1 (`kafka-python`)  |
+|Distributed Storage |Hadoop (HDFS / local), Parquet       |
+|Database            |MongoDB (`weblog_system.predictions`)|
+|ML Library          |Spark MLlib (Logistic Regression)    |
+|Compression         |LZ4                                  |
+|Supporting Libraries|pandas, logging                      |
 
-**File:** `weblog.csv` — a structured web server log file containing continuous HTTP event records.
+-----
 
-### Schema
+## Milestones
 
-| Field | Type | Description |
-|---|---|---|
-| `Timestamp` | `string → timestamp` | Event datetime |
-| `IP` | `string` | Client IP address |
-| `Endpoint` | `string` | Requested resource/URL path |
-| `Status` | `integer` | HTTP status code (e.g., 200, 404, 500) |
-| `ResponseTime` | `integer` | Request latency in milliseconds |
+### M1 — Data Foundations & System Architecture *(Weeks 1–3)*
 
-### Derived Fields (added during processing)
+- Defined the problem and characterised data by volume, velocity, and variety
+- Designed the Lambda Architecture (batch + speed + serving layers)
+- Set up environment variables for PySpark / Hadoop on Windows
+- Documented Big-O complexity for all pipeline operations
 
-| Field | Description |
-|---|---|
-| `Date` | Extracted date from `Timestamp` |
-| `Hour` | Extracted hour from `Timestamp` |
-| `IsError` | Boolean flag (`Status >= 400`) |
+### M2 — Distributed Batch Processing Pipeline *(Weeks 4–6)*
 
-### Data Characteristics
+- Initialised SparkSession with `local[*]` and `shuffle.partitions = 4`
+- Applied explicit schema enforcement on CSV ingestion
+- Cleaned data (`dropna`), parsed timestamps, and derived `Date`, `Hour`, and `IsError` columns
+- Ran `groupBy` aggregations (status code distribution, top endpoints, hourly traffic)
+- Persisted cleaned output to Parquet with `repartition(4)`
 
-- **Velocity** — Continuous stream of log events
-- **Variety** — Multiple endpoints and HTTP status codes
-- **Volume** — Designed to scale to millions of records
+### M3 — Streaming & Real-Time Systems *(Weeks 7–9)*
 
----
+- Built an optimised Kafka producer (`linger_ms=20`, `batch_size=65536`, LZ4, `acks=1`)
+- Implemented a Spark Structured Streaming consumer reading from the `weblogs` topic
+- Ran three concurrent `writeStream` queries for real-time analytics
+- Documented approximate algorithms: Bloom Filter (IP deduplication) and Count-Min Sketch (top-K URLs)
+- Compared batch vs streaming on latency, throughput, fault tolerance, and state management
 
-## Pipeline Stages
+### M4 — Scalable Machine Learning & Analytics *(Weeks 10–12)*
 
-### 1. Data Ingestion
+- Engineered 6 binary features from URL and endpoint patterns:
+  - `url_length`, `time_length`, `has_admin`, `has_login`, `has_php`, `very_long_url`
+- Trained a Logistic Regression model via Spark MLlib (`Pipeline.fit()`, `maxIter=20`)
+- Evaluated on an 80/20 train-test split
+- Extracted feature coefficients for basic explainability (`has_admin` strongest at +1.38)
 
-**Kafka Producer**
-- Reads `weblog.csv` with Pandas
-- Streams each record as a message into the `weblogs` Kafka topic
-- Optimizations:
-  - `linger_ms` and `batch_size` for batching
-  - `lz4` compression
-  - `acks=1` for balanced durability and throughput
+### M5 — System Optimisation & Deployment *(Weeks 13–14)*
 
-**Kafka Consumer (Spark)**
-- Spark session subscribes to the `weblogs` topic
-- Uses `readStream` for continuous consumption
-- Converts binary Kafka payloads to JSON strings
-- Parses JSON into structured DataFrame columns using an enforced schema
+- Built a full `run_pipeline()` orchestration function with real Spark operations (not stubs)
+- Applied `.cache()` on `train_df`, `test_df`, and `predictions` to reduce recomputation
+- Added Python `logging` module with file output and timestamp tracking
+- Integrated MongoDB writes (`collection.insert_many()`) for prediction persistence
+- Implemented anomaly rate monitoring with a configurable threshold (40%)
 
-### 2. Processing & Enrichment
+### M6 — Integrated Intelligent System & Capstone *(Week 15)*
 
-- Adds `Date` and `Hour` columns extracted from `Timestamp`
-- Adds `IsError` flag based on HTTP status code
-- Computes aggregations:
-  - **Traffic per endpoint** — request counts grouped by `Endpoint`
-  - **Hourly traffic** — request counts grouped by `Hour`
-  - **Error rates** — proportion of requests where `IsError = true`
+- End-to-end pipeline: CSV → Spark → feature engineering → model training → evaluation → MongoDB storage
+- Added a probability-weighted threat scoring UDF on the Logistic Regression probability vector
+- Final analytical outputs: status code distribution, top-URL frequency, top-threat IP ranking
+- System evaluation report generated with all metrics
 
-### 3. Output
+-----
 
-- Results written to the **console** in real time via `writeStream`
-- Architecture is extensible to:
-  - BI dashboards (e.g., Grafana, Kibana)
-  - Databases (e.g., PostgreSQL, Cassandra)
-  - Alerting / monitoring systems
+## Model Performance
 
----
+|Metric           |Value                            |
+|-----------------|---------------------------------|
+|Algorithm        |Logistic Regression (Spark MLlib)|
+|Training records |~12,806 (80%)                    |
+|Test records     |~3,201 (20%)                     |
+|**Accuracy**     |**98.59%**                       |
+|**AUC**          |**0.9476**                       |
+|Strongest feature|`has_admin` (coefficient +1.38)  |
 
-## Setup & Requirements
+-----
+
+## Known Issues & Fixes
+
+Six documented failures encountered and resolved during development:
+
+|#|Failure                                                                     |Milestone               |Fix                                                                    |
+|-|----------------------------------------------------------------------------|------------------------|-----------------------------------------------------------------------|
+|1|`NativeIO` / `winutils.exe` IOException (Hadoop on Windows)                 |M2 · Batch Pipeline     |Set `HADOOP_HOME` and `PATH` **before** `SparkSession` creation        |
+|2|`SyntaxError` on section divider `---...---`                                |M3 · Streaming Consumer |Added missing `#` prefix to make it a Python comment                   |
+|3|`ModuleNotFoundError: No module named 'kafka'`                              |M3 · Kafka Producer     |Ran `pip install kafka_python` in the active conda environment         |
+|4|`AnalysisException: Resolved attribute Status missing` (column typo `Staus`)|M4 · Feature Engineering|Renamed column in pandas **before** creating Spark DataFrame           |
+|5|`GBTClassifier` fails on small partitions with sparse labels                |M4 · Model Selection    |Switched to `LogisticRegression`; used full 16,007-row dataset         |
+|6|`run_pipeline()` contained only `print()` stubs — no real execution         |M5/M6 · Orchestration   |Replaced stubs with actual Spark operations, model calls, and DB writes|
+
+-----
+
+## Requirements Checklist
+
+All 25 milestone requirements are satisfied ✓
+
+<details>
+<summary><strong>M1 — Data Foundations & System Architecture</strong></summary>
+
+- ✓ Problem definition and data characterisation (volume, velocity, variety)
+- ✓ Data sourcing and ingestion strategy (CSV → Spark, Kafka producer)
+- ✓ Complexity and scalability analysis (Big-O table documented)
+- ✓ System architecture design (Lambda — batch + speed + serving layers)
+- ✓ Initial batch data pipeline (SparkSession + CSV read + schema enforcement)
+
+</details>
+
+<details>
+<summary><strong>M2 — Distributed Data Processing</strong></summary>
+
+- ✓ Data partitioning (`repartition(4)`, shuffle partitions = 4, `local[*]`)
+- ✓ Batch processing (PySpark `groupBy` / `agg` — MapReduce equivalent)
+- ✓ Distributed storage (Parquet write, HDFS-compatible path)
+- ✓ Fault tolerance (overwrite mode, Hadoop FileOutputCommitter fix)
+- ✓ Job scheduling / execution pipeline (notebook cell ordering + `run_pipeline()`)
+
+</details>
+
+<details>
+<summary><strong>M3 — Streaming & Real-Time Systems</strong></summary>
+
+- ✓ Streaming ingestion (optimised Kafka producer — `linger_ms`, `batch_size`, LZ4)
+- ✓ Event-driven architecture (Kafka topic `weblogs`, consumer group offsets)
+- ✓ Real-time analytics pipeline (Spark Structured Streaming + 3 `writeStream` queries)
+- ✓ Approximate algorithms documented (Bloom Filter for IP dedup, Count-Min Sketch for top-K)
+- ✓ Batch vs streaming comparison table (latency, throughput, fault tolerance, state)
+
+</details>
+
+<details>
+<summary><strong>M4 — Scalable Machine Learning & Analytics</strong></summary>
+
+- ✓ Feature engineering on large datasets (6 features engineered)
+- ✓ Model training (Logistic Regression via Spark MLlib, `maxIter=20`)
+- ✓ Distributed / parallel training (`local[*]` — all CPU cores, `Pipeline.fit()`)
+- ✓ Model validation and evaluation (80/20 split, 98.59% accuracy, 0.9476 AUC, confusion matrix)
+- ✓ Basic explainability (logistic regression coefficients extracted)
+
+</details>
+
+<details>
+<summary><strong>M5 — System Optimisation & Deployment</strong></summary>
+
+- ✓ Model deployment pipeline (`run_pipeline()` with real function calls, logging, DB write)
+- ✓ Monitoring and drift detection (anomaly rate threshold 40%, Python logging to file)
+- ✓ Pipeline optimisation (`repartition(4)`, `.cache()` on train/test/predictions)
+- ✓ Integration with NoSQL systems (MongoDB — `weblog_system.predictions` collection)
+- ✓ Workflow orchestration (`run_pipeline()` with 6 real steps + logging timestamps)
+
+</details>
+
+<details>
+<summary><strong>M6 — Integrated Intelligent System & Capstone</strong></summary>
+
+- ✓ Integration of batch + ML components (full pipeline: CSV → Spark → features → model → predictions → MongoDB)
+- ✓ End-to-end pipeline (ingestion → feature engineering → training → evaluation → monitoring → storage)
+- ✓ System-level innovation (probability-weighted threat scoring via UDF on LR probability vector)
+- ✓ Analytical outputs and interpretation (status code distribution, top-URL frequency, top-threat IP ranking)
+- ✓ System evaluation (final report: 16,007 records, 98.59% accuracy, 0.9476 AUC, deployment-ready)
+
+</details>
+
+-----
+
+## Setup & Installation
 
 ### Prerequisites
 
-- Python 3.8+
-- Apache Kafka (local or remote cluster)
-- Apache Spark 3.x with `pyspark`
-- Java 8 or 11 (required by Spark)
+|Requirement     |Version            |
+|----------------|-------------------|
+|Python          |3.x                |
+|Java (JDK)      |17                 |
+|Apache Kafka    |2.3.1+             |
+|Hadoop (Windows)|with `winutils.exe`|
+|MongoDB         |Any recent version |
+
+### Environment Variables (Windows)
+
+Set these **before** any Spark imports:
+
+```python
+import os
+os.environ["HADOOP_HOME"] = "C:\\hadoop"
+os.environ["PATH"]        += os.pathsep + "C:\\hadoop\\bin"
+os.environ["JAVA_HOME"]   = "C:\\Program Files\\Java\\jdk-17"
+```
 
 ### Python Dependencies
 
 ```bash
-pip install pandas kafka-python pyspark
+pip install pyspark kafka-python pymongo pandas
 ```
 
-### Kafka Setup
+### SparkSession Initialisation
 
-Start Zookeeper and a Kafka broker, then create the topic:
+```python
+from pyspark.sql import SparkSession
 
-```bash
-# Start Zookeeper
-bin/zookeeper-server-start.sh config/zookeeper.properties
-
-# Start Kafka broker
-bin/kafka-server-start.sh config/server.properties
-
-# Create the topic
-bin/kafka-topics.sh --create --topic weblogs --bootstrap-server localhost:9092 --partitions 3 --replication-factor 1
+spark = SparkSession.builder \
+    .master("local[*]") \
+    .appName("WebLogBatchAnalytics") \
+    .config("spark.sql.shuffle.partitions", "4") \
+    .getOrCreate()
 ```
 
----
+### Running the Pipeline
 
-## Usage
-
-### 1. Run the Kafka Producer
-
-```bash
-python producer.py --input weblog.csv --topic weblogs --bootstrap-server localhost:9092
+```python
+# Full end-to-end execution
+run_pipeline()
 ```
 
-### 2. Start the Spark Streaming Consumer
+This executes all six steps in sequence: data loading → cleaning → feature engineering → model training → evaluation → MongoDB persistence.
 
-```bash
-spark-submit \
-  --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.0 \
-  consumer.py
-```
+-----
 
-Or launch the full pipeline from the Jupyter notebook:
-
-```bash
-jupyter notebook Large-Scale_Log_Analytics_System.ipynb
-```
-
----
-
-## Output
-
-The pipeline continuously emits aggregated results to the console, for example:
-
-```
-+--------------------+-------+
-|Endpoint            |Traffic|
-+--------------------+-------+
-|/api/v1/users       |  4821 |
-|/api/v1/products    |  3107 |
-|/health             |   892 |
-+--------------------+-------+
-
-+----+-------+----------+
-|Hour|Traffic|ErrorCount|
-+----+-------+----------+
-|  9 |  1243 |       87 |
-| 10 |  1892 |      112 |
-| 11 |  2034 |       95 |
-+----+-------+----------+
-```
-
-Results can be redirected to any sink supported by Spark Structured Streaming (Kafka, JDBC, files, etc.).
-
----
-
-## Extending the System
-
-- **Add sinks** — replace or augment `writeStream` with JDBC, Kafka, or file sinks
-- **Add alerts** — trigger notifications when error rates exceed a threshold
-- **Add dashboards** — connect output to Grafana or a custom web UI
-- **Scale horizontally** — increase Kafka partitions and Spark executor count to handle higher throughput
+*SDS 2412 · Analysis of Large Datasets | Jomo Kenyatta University of Agriculture and Technology*
