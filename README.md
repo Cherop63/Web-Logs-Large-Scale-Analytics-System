@@ -206,7 +206,7 @@ Six documented failures encountered and resolved during development:
 
 ## Requirements Checklist
 
-All 25 milestone requirements are satisfied ✓
+All milestone requirements are satisfied ✓
 
 <details>
 <summary><strong>M1 — Data Foundations & System Architecture</strong></summary>
