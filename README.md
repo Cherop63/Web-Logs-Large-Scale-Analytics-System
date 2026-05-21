@@ -6,6 +6,23 @@
 
 -----
 
+## Team
+
+**Group 3 — JKUAT**
+
+|Name               |Student ID           |
+|-------------------|---------------------|
+|Joy Muthoni        |SCT213-C002-0004/2022|
+|Christine Nyokabi  |SCT213-C002-0037/2022|
+|Shawn Kimani       |SCT213-C002-0043/2022|
+|Borneventure Kinoti|SCT213-C002-0052/2022|
+|Joy Chesire        |SCT213-C002-0087/2022|
+|Angel Wangari      |SCT213-C002-0093/2022|
+
+**lecturer:** Mr. Seth
+
+-----
+
 ## Table of Contents
 
 - [Project Overview](#project-overview)
@@ -31,23 +48,6 @@ This system ingests, processes, streams, and learns from web server access logs 
 - Measure traffic volume, endpoint frequency, and error rates
 - Monitor system health via real-time streaming
 - Train and deploy an ML model for threat classification
-
------
-
-## Team
-
-**Group 3 — JKUAT**
-
-|Name               |Student ID           |
-|-------------------|---------------------|
-|Joy Muthoni        |SCT213-C002-0004/2022|
-|Christine Nyokabi  |SCT213-C002-0037/2022|
-|Shawn Kimani       |SCT213-C002-0043/2022|
-|Borneventure Kinoti|SCT213-C002-0052/2022|
-|Joy Cheptoo Chesire|SCT213-C002-0087/2022|
-|Angel Wangari      |SCT213-C002-0093/2022|
-
-**lecturer:** Mr. Seth
 
 -----
 
